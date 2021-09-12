@@ -1,4 +1,5 @@
 <script>
+import { GChart } from 'vue-google-charts'
 const MODES = ['PMD', 'SBR', 'LBR']
 
 function askNotificationPermission() {
@@ -26,6 +27,9 @@ function askNotificationPermission() {
 
 export default {
   name: 'IndexPage',
+  components: {
+    GChart,
+  },
   asyncData() {
     askNotificationPermission()
 
@@ -52,7 +56,23 @@ export default {
     const minTime = JSON.parse(localStorage.getItem(MODES[0])).min
     const secTime = JSON.parse(localStorage.getItem(MODES[0])).secs
     const mode = MODES[0]
-    return { hourTime, minTime, secTime, mode, MODES }
+
+    // dummy data
+    const chartData = [
+      ['Hour', 'Present', 'Average', 'Max'],
+      ['0', 0, 0, 2],
+      ['1', 0, 0, 3],
+      ['2', 1, 5, 10],
+    ]
+    const chartOptions = {
+      hAxis: {
+        title: 'Hour of Day',
+      },
+      vAxis: {
+        title: 'Minutes Worked',
+      },
+    }
+    return { hourTime, minTime, secTime, mode, MODES, chartData, chartOptions }
   },
 
   data() {
@@ -233,6 +253,11 @@ export default {
       return interval
     },
 
+    // sendToServer(data) {
+    //   axios.post(data)
+    //   localStorage.removeItem('P-DATA')
+    // }
+
     switchMode(mode) {
       if (!mode || this.mode === mode) {
         return
@@ -300,6 +325,18 @@ export default {
           </button>
         </div>
       </div>
+    </div>
+    <div>
+      <p v-if="pendingData" class="w-64 shadow-md cursor-pointer p-2">
+        You have unsaved data.Click to save
+      </p>
+
+      <GChart
+        :settings="{ packages: ['corechart'] }"
+        type="LineChart"
+        :data="chartData"
+        :options="chartOptions"
+      />
     </div>
   </div>
 </template>
