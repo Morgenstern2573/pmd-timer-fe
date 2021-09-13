@@ -1,5 +1,6 @@
 <script>
 import { GChart } from 'vue-google-charts'
+import { saveTime } from '~/lib/api'
 const MODES = ['PMD', 'SBR', 'LBR']
 
 function askNotificationPermission() {
@@ -130,13 +131,19 @@ export default {
       return { status: 'ok', hr, min, secs }
     },
 
-    countDown() {
+    async countDown() {
       this.startTime = new Date()
 
       if (this.pendingData) {
         this.loading = true
+        const timeInterval = JSON.parse(localStorage.getItem('P-DATA'))
         try {
-          // sendToServer(JSON.parse(localStorage.getItem('P-DATA')))
+          for (const key in timeInterval) {
+            if (Object.hasOwnProperty.call(timeInterval, key)) {
+              await saveTime(key, timeInterval[key])
+            }
+          }
+          localStorage.removeItem('P-DATA')
         } catch (err) {
           console.log(err)
           console.log('failed to save pending data')
@@ -158,6 +165,7 @@ export default {
         }
 
         if (val.status === 'finished') {
+          this.pauseCountDown()
           if (Notification.permission === 'granted') {
             // eslint-disable-next-line no-unused-vars
             const not = new Notification('Pomodoro Timer', {
@@ -186,21 +194,28 @@ export default {
       }, 1000)
     },
 
-    pauseCountDown() {
+    async pauseCountDown() {
       this.endTime = new Date()
       this.counting = false
       const timeInterval = this.getInterval(this.startTime, this.endTime)
       // insert sending api to server here
       this.loading = true
-      try {
-        // sendToServer(timeInterval)
-      } catch {
-        if (!JSON.parse(localStorage.getItem('P-DATA'))) {
-          localStorage.setItem('P-DATA', JSON.stringify(timeInterval))
-        } else {
-          let d = JSON.parse(localStorage.getItem('P-DATA'))
-          d = Object.assign(d, timeInterval)
-          localStorage.setItem('P-DATA', JSON.stringify(d))
+      if (this.mode === MODES[0]) {
+        try {
+          for (const key in timeInterval) {
+            if (Object.hasOwnProperty.call(timeInterval, key)) {
+              await saveTime(key, timeInterval[key])
+            }
+          }
+          localStorage.removeItem('P-DATA')
+        } catch {
+          if (!JSON.parse(localStorage.getItem('P-DATA'))) {
+            localStorage.setItem('P-DATA', JSON.stringify(timeInterval))
+          } else {
+            let d = JSON.parse(localStorage.getItem('P-DATA'))
+            d = Object.assign(d, timeInterval)
+            localStorage.setItem('P-DATA', JSON.stringify(d))
+          }
         }
       }
       this.loading = false
@@ -217,6 +232,7 @@ export default {
       const endHour = end.getHours()
       let r
       if (stHour < endHour) {
+        interval[start.toDateString()] = {}
         for (let i = stHour; i <= endHour; i++) {
           if (i === stHour) {
             r = 60 - start.getMinutes()
@@ -227,9 +243,10 @@ export default {
             minutesDifference = minutesDifference - 60
             r = 60
           }
-          interval[i] = r
+          interval[start.toDateString()][i] = r
         }
       } else if (stHour > endHour) {
+        interval[start.toDateString()] = {}
         for (let i = stHour; i <= 23; i++) {
           if (i === stHour) {
             r = 60 - start.getMinutes()
@@ -238,25 +255,22 @@ export default {
             minutesDifference = minutesDifference - 60
             r = 60
           }
-          interval[i] = r
+          interval[start.toDateString()][i] = r
         }
         for (let i = 0; i <= endHour; i++) {
+          interval[end.toDateString()] = {}
           if (i === endHour) {
             r = minutesDifference
           }
-          interval[i] = r
+          interval[end.toDateString()][i] = r
         }
       } else {
-        interval[stHour] = minutesDifference
+        interval[start.toDateString()] = {}
+        interval[start.toDateString()][stHour] = minutesDifference
       }
 
       return interval
     },
-
-    // sendToServer(data) {
-    //   axios.post(data)
-    //   localStorage.removeItem('P-DATA')
-    // }
 
     switchMode(mode) {
       if (!mode || this.mode === mode) {
