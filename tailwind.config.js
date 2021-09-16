@@ -5,7 +5,12 @@ module.exports = {
   },
   purge: [],
   theme: {
-    extend: {},
+    extend: {
+      fontSize: {
+        '8xl': '8rem',
+        '10xl': '10rem',
+      },
+    },
   },
   variants: {},
   plugins: [],

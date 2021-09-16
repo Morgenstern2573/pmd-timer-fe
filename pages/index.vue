@@ -1,6 +1,7 @@
 <script>
 import { GChart } from 'vue-google-charts'
-import { saveTime } from '~/lib/api'
+import lOverlay from '~/components/l-overlay.vue'
+import { saveTime, getUserAvg, getTodayData, getMaxDay } from '~/lib/api'
 const MODES = ['PMD', 'SBR', 'LBR']
 
 function askNotificationPermission() {
@@ -26,12 +27,37 @@ function askNotificationPermission() {
   }
 }
 
+function generateChartData(avg, cur, max) {
+  const chartData = [['Hour', 'Present', 'Average', 'Max']]
+  for (let i = 0; i < 24; i++) {
+    const h = String(i)
+    let a = avg[h]
+    let b = cur[h]
+    let c = max[h]
+
+    if (!a) {
+      a = 0
+    }
+
+    if (!b) {
+      b = 0
+    }
+
+    if (!c) {
+      c = 0
+    }
+
+    chartData.push([h, b, a, c])
+  }
+  return chartData
+}
 export default {
   name: 'IndexPage',
   components: {
     GChart,
+    lOverlay,
   },
-  asyncData() {
+  async asyncData() {
     askNotificationPermission()
 
     if (!JSON.parse(localStorage.getItem(MODES[0]))) {
@@ -57,14 +83,18 @@ export default {
     const minTime = JSON.parse(localStorage.getItem(MODES[0])).min
     const secTime = JSON.parse(localStorage.getItem(MODES[0])).secs
     const mode = MODES[0]
-
-    // dummy data
-    const chartData = [
-      ['Hour', 'Present', 'Average', 'Max'],
-      ['0', 0, 0, 2],
-      ['1', 0, 0, 3],
-      ['2', 1, 5, 10],
-    ]
+    let avg, cur, max, chartData
+    try {
+      avg = (await getUserAvg()).data.data
+      cur = (await getTodayData()).data.data
+      max = (await getMaxDay()).data.data
+      chartData = generateChartData(avg, cur, max)
+      console.log(avg, cur, max)
+    } catch (err) {
+      // add code to disable rendering of the chart if data fetch fails
+      alert('Error while fetching chart data')
+      console.log(err)
+    }
     const chartOptions = {
       hAxis: {
         title: 'Hour of Day',
@@ -72,8 +102,25 @@ export default {
       vAxis: {
         title: 'Minutes Worked',
       },
+
+      series: {
+        0: { lineWidth: 6 },
+        1: { lineWidth: 4, lineDashStyle: [4, 4] },
+        2: { lineWidth: 4, lineDashStyle: [4, 4] },
+      },
     }
-    return { hourTime, minTime, secTime, mode, MODES, chartData, chartOptions }
+    return {
+      hourTime,
+      minTime,
+      secTime,
+      mode,
+      MODES,
+      chartData,
+      chartOptions,
+      avg,
+      cur,
+      max,
+    }
   },
 
   data() {
@@ -83,7 +130,7 @@ export default {
       intervalId: 0,
       pmdCount: 0,
       counting: false,
-      pendingData: Boolean(JSON.parse(localStorage.getItem('P-DATA'))),
+      pendingData: Boolean(localStorage.getItem('P-DATA')),
       loading: false,
     }
   },
@@ -131,26 +178,8 @@ export default {
       return { status: 'ok', hr, min, secs }
     },
 
-    async countDown() {
+    countDown() {
       this.startTime = new Date()
-
-      if (this.pendingData) {
-        this.loading = true
-        const timeInterval = JSON.parse(localStorage.getItem('P-DATA'))
-        try {
-          for (const key in timeInterval) {
-            if (Object.hasOwnProperty.call(timeInterval, key)) {
-              await saveTime(key, timeInterval[key])
-            }
-          }
-          localStorage.removeItem('P-DATA')
-        } catch (err) {
-          console.log(err)
-          console.log('failed to save pending data')
-        }
-        this.loading = false
-      }
-
       this.counting = true
 
       this.intervalId = setInterval(() => {
@@ -197,36 +226,53 @@ export default {
     async pauseCountDown() {
       this.endTime = new Date()
       this.counting = false
+      clearInterval(this.intervalId)
+
       const timeInterval = this.getInterval(this.startTime, this.endTime)
       // insert sending api to server here
       this.loading = true
-      if (this.mode === MODES[0]) {
+      if (this.mode === MODES[0] && Object.keys(timeInterval).length > 0) {
         try {
+          let response
           for (const key in timeInterval) {
             if (Object.hasOwnProperty.call(timeInterval, key)) {
-              await saveTime(key, timeInterval[key])
+              response = await saveTime(key, timeInterval[key])
             }
           }
-          localStorage.removeItem('P-DATA')
+
+          this.cur = response.data.data
+          this.chartData = generateChartData(this.avg, this.cur, this.max)
         } catch {
-          if (!JSON.parse(localStorage.getItem('P-DATA'))) {
-            localStorage.setItem('P-DATA', JSON.stringify(timeInterval))
+          alert('failed to save pending data')
+          let d = JSON.parse(localStorage.getItem('P-DATA'))
+          if (!d || d.length === 0) {
+            const a = JSON.stringify([timeInterval])
+            localStorage.setItem('P-DATA', a)
           } else {
-            let d = JSON.parse(localStorage.getItem('P-DATA'))
-            d = Object.assign(d, timeInterval)
-            localStorage.setItem('P-DATA', JSON.stringify(d))
+            d.push(timeInterval)
+            d = JSON.stringify(d)
+            localStorage.setItem('P-DATA', d)
           }
+
+          this.pendingData = true
         }
       }
       this.loading = false
-
-      clearInterval(this.intervalId)
     },
 
     getInterval(start, end) {
       let minutesDifference = Math.trunc(
         (end.getTime() - start.getTime()) / 60000
       )
+
+      if (minutesDifference === 0) {
+        return {}
+      }
+      // TO-DO
+      // Add code to return an empty interval if minute difference
+      // is greater than the time for a pomodoro??
+      // need a way to ensure accurate readings when the device goes to sleep
+      // create a new date object at the end of every tick? idk
       const interval = {}
       const stHour = start.getHours()
       const endHour = end.getHours()
@@ -272,13 +318,40 @@ export default {
       return interval
     },
 
-    switchMode(mode) {
+    async retrySave() {
+      this.loading = true
+      const intervalList = JSON.parse(localStorage.getItem('P-DATA'))
+      if (!intervalList || intervalList.length === 0) {
+        localStorage.removeItem('P-DATA')
+        return
+      }
+      for (let i = 0; i < intervalList.length; i++) {
+        const timeInterval = intervalList[i]
+        if (Object.keys(timeInterval).length > 0) {
+          try {
+            for (const key in timeInterval) {
+              if (Object.hasOwnProperty.call(timeInterval, key)) {
+                await saveTime(key, timeInterval[key])
+              }
+            }
+            localStorage.removeItem('P-DATA')
+            this.pendingData = false
+          } catch (err) {
+            console.log(err)
+            alert('failed to save pending data')
+          }
+        }
+      }
+      this.loading = false
+    },
+
+    async switchMode(mode) {
       if (!mode || this.mode === mode) {
         return
       }
 
+      await this.pauseCountDown()
       this.mode = mode
-      this.pauseCountDown()
       const time = JSON.parse(localStorage.getItem(mode))
       this.hourTime = time.hours
       this.minTime = time.min
@@ -290,6 +363,7 @@ export default {
 
 <template>
   <div class="container mx-auto">
+    <l-overlay :visible="loading"></l-overlay>
     <div>
       <h1 class="text-2xl my-4 text-center uppercase">Tomato timer</h1>
       <div class="flex justify-center">
@@ -316,9 +390,10 @@ export default {
         </button>
       </div>
       <div class="flex justify-center my-8">
-        <span class="cnt-number leading-none">
-          {{ padZeros(hourTime) }} : {{ padZeros(minTime) }} :
-          {{ padZeros(secTime) }}
+        <span class="text-5xl md:text-8xl leading-none font-normal">
+          {{ padZeros(hourTime) }}:{{ padZeros(minTime) }}:{{
+            padZeros(secTime)
+          }}
         </span>
       </div>
       <div>
@@ -341,7 +416,11 @@ export default {
       </div>
     </div>
     <div>
-      <p v-if="pendingData" class="w-64 shadow-md cursor-pointer p-2">
+      <p
+        v-if="pendingData"
+        class="w-64 shadow-md cursor-pointer p-2"
+        @click="retrySave"
+      >
         You have unsaved data.Click to save
       </p>
 
@@ -358,10 +437,6 @@ export default {
 <style>
 .btn {
   @apply bg-white px-3 py-2 rounded leading-none mx-2;
-}
-
-.cnt-number {
-  font-size: 10rem;
 }
 
 .active {
