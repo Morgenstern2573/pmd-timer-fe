@@ -1,9 +1,9 @@
 <script>
-import { registerUser } from '~/lib/api'
+import { loginUser } from '~/lib/api'
 import lOverlay from '~/components/l-overlay.vue'
 
 export default {
-  name: 'SignUpPage',
+  name: 'LogInPage',
   components: {
     lOverlay,
   },
@@ -11,7 +11,6 @@ export default {
     return {
       username: '',
       password: '',
-      confirm: '',
       errorMsg: '',
       loading: false,
     }
@@ -21,13 +20,7 @@ export default {
     async submitForm() {
       this.username = this.username.trim()
       this.password = this.password.trim()
-      this.confirm = this.confirm.trim()
-
-      if (
-        this.username.length === 0 ||
-        this.password.length === 0 ||
-        this.confirm.length === 0
-      ) {
+      if (this.username.length === 0 || this.password.length === 0) {
         this.errorMsg = 'No fields can be empty!'
         return
       }
@@ -42,14 +35,9 @@ export default {
         return
       }
 
-      if (this.password !== this.confirm) {
-        this.errorMsg = "Password and confirmation don't match"
-        return
-      }
-
       this.loading = true
       try {
-        const response = await registerUser(this.username, this.password)
+        const response = await loginUser(this.username, this.password)
         if (response.data.status !== 'ok') {
           this.errorMsg = response.data.error
         } else {
@@ -57,7 +45,7 @@ export default {
         }
       } catch (err) {
         console.log(err)
-        alert('Error registering user')
+        alert('Error Logging In user')
       }
       this.loading = false
     },
@@ -74,7 +62,7 @@ export default {
         class="bg-white px-6 py-8 rounded shadow-md text-black w-full border border-gray-100"
         @submit.prevent="submitForm"
       >
-        <h1 class="mb-8 text-3xl text-center leading-none">Sign up</h1>
+        <h1 class="mb-8 text-3xl text-center leading-none">Log In</h1>
 
         <p
           v-show="errorMsg.length > 0"
@@ -105,30 +93,22 @@ export default {
           name="password"
           placeholder="Password"
         />
-        <input
-          v-model="confirm"
-          type="password"
-          class="block border border-grey-light w-full p-3 rounded mb-4"
-          name="confirm_password"
-          placeholder="Confirm Password"
-        />
 
         <button
           type="submit"
           class="w-full text-center py-3 rounded bg-red-500 text-white hover:bg-red-800 focus:outline-none my-1"
         >
-          Sign up
+          Log In
         </button>
       </form>
 
       <div class="text-grey-dark mt-6">
-        Already have an account?
+        Don't have an account?
         <nuxt-link
-          to="/login"
+          to="/signup"
           class="no-underline border-b border-blue text-red-300"
-          href="../login/"
         >
-          Log in </nuxt-link
+          Register </nuxt-link
         >.
       </div>
     </div>

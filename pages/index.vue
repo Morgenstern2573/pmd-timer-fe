@@ -1,7 +1,13 @@
 <script>
 import { GChart } from 'vue-google-charts'
 import lOverlay from '~/components/l-overlay.vue'
-import { saveTime, getUserAvg, getTodayData, getMaxDay } from '~/lib/api'
+import {
+  saveTime,
+  getUserAvg,
+  getTodayData,
+  getMaxDay,
+  checkLoginStatus,
+} from '~/lib/api'
 const MODES = ['PMD', 'SBR', 'LBR']
 
 function askNotificationPermission() {
@@ -57,7 +63,13 @@ export default {
     GChart,
     lOverlay,
   },
-  async asyncData() {
+  async asyncData({ redirect }) {
+    const loginStatus = (await checkLoginStatus()).data.message
+
+    if (loginStatus === 'no') {
+      // return redirect('/login')
+    }
+
     askNotificationPermission()
 
     if (!JSON.parse(localStorage.getItem(MODES[0]))) {
