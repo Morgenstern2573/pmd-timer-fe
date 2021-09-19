@@ -431,7 +431,7 @@ export default {
       this.loading = true
       try {
         await logOutUser()
-        this.$refresh()
+        this.$router.push('/login')
       } catch (err) {
         console.log(err)
         alert('logout failed')
@@ -443,7 +443,7 @@ export default {
 </script>
 
 <template>
-  <div class="container mx-auto px-3 md:px-5">
+  <div class="container mx-auto px-3 md:px-5 min-h-screen flex flex-col">
     <l-overlay :visible="loading"></l-overlay>
     <settings-form
       :visible="showSettings"
@@ -535,7 +535,7 @@ export default {
       </button>
     </div>
     <!-- chart and warning -->
-    <div>
+    <div class="mb-4">
       <!-- button for unsaved data -->
       <button
         v-if="pendingData"
@@ -565,6 +565,15 @@ export default {
         :options="chartOptions"
       />
     </div>
+
+    <footer class="flex mt-auto justify-center text-sm text-gray-900 p-3">
+      <p>
+        Made by
+        <a class="text-red-600" href="Morgenstern2573.github.io"
+          >Paul Akinyemi</a
+        >
+      </p>
+    </footer>
   </div>
 </template>
 
