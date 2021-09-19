@@ -454,7 +454,7 @@ export default {
       "
     ></settings-form>
 
-    <header>
+    <header class="mb-8">
       <div class="container mx-auto flex flex-wrap py-5 items-center">
         <a
           class="flex title-font font-medium items-center text-gray-900 w-3/5 md:w-auto"
@@ -473,6 +473,11 @@ export default {
         <nav
           class="md:ml-auto flex flex-col md:flex-row items-end flex-wrap md:items-center text-base justify-center w-2/5 md:w-auto"
         >
+          <nuxt-link
+            class="text-lg md:text-xl underline mb-2 sm:md-4 md:mr-5 md:mb-0 cursor-pointer text-red-500"
+            to="/help"
+            >Help</nuxt-link
+          >
           <a
             class="mb-2 sm:md-4 md:mr-5 md:mb-0 cursor-pointer text-red-500"
             title="Settings"
