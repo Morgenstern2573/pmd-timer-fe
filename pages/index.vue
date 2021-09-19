@@ -21,14 +21,14 @@ function askNotificationPermission() {
     }
   }
 
-  if (Notification.permission !== 'default') {
-    return
-  }
-
   // Let's check if the browser supports notifications
   if (!('Notification' in window)) {
     console.log('This browser does not support notifications.')
   } else {
+    if (Notification.permission !== 'default') {
+      return
+    }
+
     Notification.requestPermission().then((permission) => {
       handlePermission(permission)
     })
@@ -254,7 +254,10 @@ export default {
 
         if (val.status === 'finished') {
           this.pauseCountDown()
-          if (Notification.permission === 'granted') {
+          if (
+            'Notification' in window &&
+            Notification.permission === 'granted'
+          ) {
             // eslint-disable-next-line no-unused-vars
             const not = new Notification('Pomodoro Timer', {
               body: 'Your time is up!',
