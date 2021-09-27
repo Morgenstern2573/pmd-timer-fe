@@ -67,16 +67,15 @@ export default {
     SettingsForm,
   },
   async asyncData({ redirect }) {
+    let loginStatus
     try {
-      const loginStatus = (await checkLoginStatus()).data.message
-      if (loginStatus === 'no') {
-        return redirect('/login')
+      loginStatus = (await checkLoginStatus()).data.message
+      if (loginStatus !== 'no') {
+        askNotificationPermission()
       }
     } catch (err) {
       console.log(err)
     }
-
-    askNotificationPermission()
 
     if (!JSON.parse(localStorage.getItem(MODES[0]))) {
       localStorage.setItem(
@@ -102,31 +101,33 @@ export default {
     const minTime = pmd.min
     const secTime = pmd.secs
     const mode = MODES[0]
-    let avg, cur, max, chartData
-    try {
-      avg = (await getUserAvg()).data.data
-      cur = (await getTodayData()).data.data
-      max = (await getMaxDay()).data.data
-      chartData = generateChartData(avg, cur, max)
-      console.log(avg, cur, max)
-    } catch (err) {
-      // add code to disable rendering of the chart if data fetch fails
-      alert('Error while fetching chart data')
-      console.log(err)
-    }
-    const chartOptions = {
-      hAxis: {
-        title: 'Hour of Day',
-      },
-      vAxis: {
-        title: 'Minutes Worked',
-      },
+    let avg, cur, max, chartData, chartOptions
+    if (loginStatus !== 'no') {
+      try {
+        avg = (await getUserAvg()).data.data
+        cur = (await getTodayData()).data.data
+        max = (await getMaxDay()).data.data
+        chartData = generateChartData(avg, cur, max)
+        console.log(avg, cur, max)
+      } catch (err) {
+        // add code to disable rendering of the chart if data fetch fails
+        alert('Error while fetching chart data')
+        console.log(err)
+      }
+      chartOptions = {
+        hAxis: {
+          title: 'Hour of Day',
+        },
+        vAxis: {
+          title: 'Minutes Worked',
+        },
 
-      series: {
-        0: { lineWidth: 6 },
-        1: { lineWidth: 4, lineDashStyle: [4, 4] },
-        2: { lineWidth: 4, lineDashStyle: [4, 4] },
-      },
+        series: {
+          0: { lineWidth: 6 },
+          1: { lineWidth: 4, lineDashStyle: [4, 4] },
+          2: { lineWidth: 4, lineDashStyle: [4, 4] },
+        },
+      }
     }
     return {
       hourTime,
@@ -139,6 +140,7 @@ export default {
       avg,
       cur,
       max,
+      loginStatus,
     }
   },
 
@@ -158,6 +160,9 @@ export default {
   computed: {
     currentSum() {
       let sum = 0
+      if (!this.cur) {
+        return
+      }
       for (const key in this.cur) {
         if (Object.hasOwnProperty.call(this.cur, key)) {
           sum += this.cur[key]
@@ -172,22 +177,24 @@ export default {
     },
 
     percentileScore() {
+      if (!this.cur || !this.avg) {
+        return
+      }
       let cSum = 0
       for (const key in this.cur) {
         if (Object.hasOwnProperty.call(this.cur, key)) {
           cSum += this.cur[key]
         }
       }
-
-      if (cSum === 0) {
-        return 0
-      }
-
       let aSum = 0
       for (const key in this.avg) {
         if (Object.hasOwnProperty.call(this.avg, key)) {
           aSum += this.avg[key]
         }
+      }
+
+      if (cSum === 0 || aSum === 0) {
+        return 0
       }
 
       return Math.trunc((cSum / aSum) * 100)
@@ -253,7 +260,7 @@ export default {
         }
 
         if (val.status === 'finished') {
-          this.pauseCountDown()
+          // this.pauseCountDown()
           if (
             'Notification' in window &&
             Notification.permission === 'granted'
@@ -290,38 +297,43 @@ export default {
       this.counting = false
       clearInterval(this.intervalId)
 
-      const timeInterval = this.getInterval(this.startTime, this.endTime)
-      // insert sending api to server here
-      this.loading = true
-      if (this.mode === MODES[0] && Object.keys(timeInterval).length > 0) {
-        try {
-          let response
-          for (const key in timeInterval) {
-            if (Object.hasOwnProperty.call(timeInterval, key)) {
-              response = await saveTime(key, timeInterval[key])
+      if (this.loginStatus !== 'no') {
+        const timeInterval = this.getInterval(this.startTime, this.endTime)
+        // insert sending api to server here
+        this.loading = true
+        if (this.mode === MODES[0] && Object.keys(timeInterval).length > 0) {
+          try {
+            let response
+            console.log(timeInterval)
+            for (const key in timeInterval) {
+              if (Object.hasOwnProperty.call(timeInterval, key)) {
+                response = await saveTime(key, timeInterval[key])
+                console.log('request made')
+              }
             }
+
+            this.cur = response.data.data
+            this.chartData = []
+            this.chartData = generateChartData(this.avg, this.cur, this.max)
+          } catch {
+            alert('failed to save pending data')
+            let d = JSON.parse(localStorage.getItem('P-DATA'))
+            if (!d || d.length === 0) {
+              const a = JSON.stringify([timeInterval])
+              localStorage.setItem('P-DATA', a)
+            } else {
+              d.push(timeInterval)
+              d = JSON.stringify(d)
+              localStorage.setItem('P-DATA', d)
+            }
+
+            this.pendingData = true
           }
 
-          this.cur = response.data.data
-          this.chartData = generateChartData(this.avg, this.cur, this.max)
-        } catch {
-          alert('failed to save pending data')
-          let d = JSON.parse(localStorage.getItem('P-DATA'))
-          if (!d || d.length === 0) {
-            const a = JSON.stringify([timeInterval])
-            localStorage.setItem('P-DATA', a)
-          } else {
-            d.push(timeInterval)
-            d = JSON.stringify(d)
-            localStorage.setItem('P-DATA', d)
-          }
-
-          this.pendingData = true
+          this.startTime = this.endTime
         }
-
-        this.startTime = this.endTime
+        this.loading = false
       }
-      this.loading = false
     },
 
     getInterval(start, end) {
@@ -495,6 +507,7 @@ export default {
           </a>
 
           <button
+            v-if="loginStatus !== 'no'"
             class="inline-flex items-center text-red-900 bg-white border border-red-900 py-1 px-1 md:px-3 focus:outline-none hover:bg-red-900 hover:text-white rounded text-sm md:text-base"
             @click="logOut"
           >
@@ -543,7 +556,7 @@ export default {
       </button>
     </div>
     <!-- chart and warning -->
-    <div class="mb-4">
+    <div v-if="loginStatus !== 'no'" class="mb-4">
       <!-- button for unsaved data -->
       <button
         v-if="pendingData"
@@ -574,10 +587,28 @@ export default {
       />
     </div>
 
+    <div v-else class="mb-4 flex justify-center items-center p-5 flex-col">
+      <span class="mb-4">
+        <svg
+          class="w-10 h-10 md:w-12 md:h-12 lg:w-16 lg:h-16 text-red-600"
+          viewBox="0 0 24 24"
+        >
+          <path
+            fill="currentColor"
+            d="M11,9H13V7H11M12,20C7.59,20 4,16.41 4,12C4,7.59 7.59,4 12,4C16.41,4 20,7.59 20,12C20,16.41 16.41,20 12,20M12,2A10,10 0 0,0 2,12A10,10 0 0,0 12,22A10,10 0 0,0 22,12A10,10 0 0,0 12,2M11,17H13V11H11V17Z"
+          />
+        </svg>
+      </span>
+      <p>
+        <nuxt-link to="/login" class="text-red-600">Log In</nuxt-link> to enable
+        your Percentile Feedback
+      </p>
+    </div>
+
     <footer class="flex mt-auto justify-center text-sm text-gray-900 p-3">
       <p>
         Made by
-        <a class="text-red-600" href="Morgenstern2573.github.io"
+        <a class="text-red-600" href="https://Morgenstern2573.github.io"
           >Paul Akinyemi</a
         >
       </p>
