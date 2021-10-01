@@ -260,11 +260,10 @@ export default {
         }
 
         if (val.status === 'finished') {
+          console.log(Notification)
+          console.log('Notification' in window)
           // this.pauseCountDown()
-          if (
-            'Notification' in window &&
-            Notification.permission === 'granted'
-          ) {
+          if (Notification && Notification.permission === 'granted') {
             // eslint-disable-next-line no-unused-vars
             const not = new Notification('Pomodoro Timer', {
               body: 'Your time is up!',
@@ -434,8 +433,7 @@ export default {
       this.secTime = time.secs
     },
 
-    async refreshMode() {
-      await this.pauseCountDown()
+    refreshMode() {
       const time = JSON.parse(localStorage.getItem(this.mode))
       this.hourTime = time.hours
       this.minTime = time.min
@@ -494,6 +492,7 @@ export default {
             >Help</nuxt-link
           >
           <a
+            v-show="!counting"
             class="mb-2 sm:md-4 md:mr-5 md:mb-0 cursor-pointer text-red-500"
             title="Settings"
             @click="showSettings = true"
