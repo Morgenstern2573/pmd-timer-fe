@@ -74,6 +74,7 @@ export default {
         askNotificationPermission()
       }
     } catch (err) {
+      loginStatus = 'no'
       console.log(err)
     }
 
@@ -314,8 +315,10 @@ export default {
             this.cur = response.data.data
             this.chartData = []
             this.chartData = generateChartData(this.avg, this.cur, this.max)
-          } catch {
-            alert('failed to save pending data')
+          } catch (err) {
+            console.log(err)
+
+            alert('failed to save pending data. refresh and try again')
             let d = JSON.parse(localStorage.getItem('P-DATA'))
             if (!d || d.length === 0) {
               const a = JSON.stringify([timeInterval])
@@ -444,6 +447,7 @@ export default {
       this.loading = true
       try {
         await logOutUser()
+        localStorage.removeItem('token')
         this.$router.push('/login')
       } catch (err) {
         console.log(err)

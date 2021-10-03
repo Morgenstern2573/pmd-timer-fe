@@ -41,6 +41,7 @@ export default {
         if (response.data.status !== 'ok') {
           this.errorMsg = response.data.error
         } else {
+          localStorage.setItem('token', response.data.token)
           this.$router.push('/')
         }
       } catch (err) {
