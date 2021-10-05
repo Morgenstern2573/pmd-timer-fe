@@ -261,6 +261,7 @@ export default {
         }
 
         if (val.status === 'finished') {
+          document.getElementById('audio').play()
           console.log(Notification)
           console.log('Notification' in window)
           // this.pauseCountDown()
@@ -461,6 +462,9 @@ export default {
 
 <template>
   <div class="container mx-auto px-3 md:px-5 min-h-screen flex flex-col">
+    <audio id="audio">
+      <source src="bell-ring.mp3" type="" />
+    </audio>
     <l-overlay :visible="loading"></l-overlay>
     <settings-form
       :visible="showSettings"
