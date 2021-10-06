@@ -72,7 +72,7 @@ export default {
       }
 
       if (this.pmdMin > 60 || this.sMin > 60 || this.lMin > 60) {
-        this.errorMsg = 'Minute vales must be less than 60.'
+        this.errorMsg = 'Minute values must be less than 60.'
         return
       }
 
