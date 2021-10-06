@@ -26,11 +26,23 @@ function askNotificationPermission() {
     console.log('This browser does not support notifications.')
   } else {
     if (Notification.permission !== 'default') {
-      return
+      return Notification.permission
     }
 
     Notification.requestPermission().then((permission) => {
       handlePermission(permission)
+    })
+  }
+}
+function showNotification() {
+  let result = askNotificationPermission()
+  if (result === 'granted') {
+    navigator.serviceWorker.getRegistration().then(function (registration) {
+      console.log(registration)
+      registration.showNotification('Tomato Timer', {
+        body: 'Your time is up!',
+        vibrate: [200, 100, 200, 100, 200, 100, 200],
+      })
     })
   }
 }
@@ -67,6 +79,7 @@ export default {
     SettingsForm,
   },
   async asyncData({ redirect }) {
+    navigator.serviceWorker.register('sw.js')
     let loginStatus
     try {
       loginStatus = (await checkLoginStatus()).data.message
@@ -262,15 +275,17 @@ export default {
 
         if (val.status === 'finished') {
           document.getElementById('audio').play()
-          console.log(Notification)
-          console.log('Notification' in window)
-          // this.pauseCountDown()
-          if (Notification && Notification.permission === 'granted') {
-            // eslint-disable-next-line no-unused-vars
-            const not = new Notification('Pomodoro Timer', {
-              body: 'Your time is up!',
-            })
-          }
+          // console.log(Notification)
+          // console.log('Notification' in window)
+          // // this.pauseCountDown()
+          // if (Notification && Notification.permission === 'granted') {
+          //   // eslint-disable-next-line no-unused-vars
+          //   const not = new Notification('Pomodoro Timer', {
+          //     body: 'Your time is up!',
+          //   })
+          // }
+
+          showNotification()
 
           if (this.mode !== MODES[0]) {
             this.switchMode(MODES[0])
